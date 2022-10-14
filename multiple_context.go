@@ -40,12 +40,10 @@ func getHTTPRequest(ctx context.Context, value, sleepTime, group int) error {
 func tryGetHTTPRequest(ctx context.Context, index, group int) func() error {
 	return func() error {
 		select {
-		// propagates errors through the context
 		case <-ctx.Done():
 			fmt.Println(group, index, "cancelled")
 			return ctx.Err()
 		default:
-			// main logic, note that if a context is cancelled it won't reach this path
 			err := getHTTPRequest(ctx, index, 10000, group)
 			if err != nil {
 				return err

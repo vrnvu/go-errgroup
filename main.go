@@ -94,3 +94,8 @@ func Workers(workers int, input []int) []int {
 
 	return buildResult(results)
 }
+
+func main() {
+	// s := newService(1)
+	// i := []int{1, 2, 3}
+}

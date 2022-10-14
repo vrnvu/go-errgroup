@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"testing"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func assert(t *testing.T, got []int, want []int) {
 	if len(got) != len(want) {
-		t.Fatalf("len got != len want")
+		t.Fatalf("len got != len want, %v = %v", got, want)
 	}
 
 	for i := range want {
@@ -46,5 +49,54 @@ func TestWorkers(t *testing.T) {
 				assert(t, got, want)
 			})
 		}
+	}
+}
+
+func TestBackground(t *testing.T) {
+	for inputSize := 100; inputSize <= 1000; inputSize = inputSize + 100 {
+		input := buildInput(inputSize)
+		want := buildOutput(input)
+		for workers := 1; workers <= 6; workers++ {
+			s := newService(workers)
+			t.Run(fmt.Sprintf("inputSize: %d workers %d", inputSize, workers), func(t *testing.T) {
+				got := s.request(input)
+				assert(t, got, want)
+			})
+		}
+	}
+}
+
+func helperParallel(ctx context.Context, s *service, input []int, resultC chan []int) func() error {
+	return func() error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			r := s.request(input)
+			fmt.Println(r)
+			resultC <- r
+			return nil
+		}
+	}
+}
+
+func TestBackgroundInParallel(t *testing.T) {
+	input := buildInput(1000)
+	want := buildOutput(input)
+
+	numberOfRequestInParalell := 10000
+	numberOfWorkers := 16
+	s := newService(numberOfWorkers)
+
+	g, ctx := errgroup.WithContext(context.Background())
+	resultC := make(chan []int, numberOfRequestInParalell)
+	for i := 0; i < numberOfRequestInParalell; i++ {
+		g.Go(helperParallel(ctx, s, input, resultC))
+	}
+	g.Wait()
+	close(resultC)
+
+	for got := range resultC {
+		assert(t, got, want)
 	}
 }
