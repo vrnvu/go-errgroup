@@ -11,17 +11,17 @@ import (
 type service struct {
 }
 
-type fetchSingleDocumentJob struct {
-	ctx            context.Context
-	g              *errgroup.Group
-	job            int
-	resultsChannel chan<- int
-	wg             *sync.WaitGroup
+type jobRequest struct {
+	ctx      context.Context
+	g        *errgroup.Group
+	job      int
+	resultsC chan<- int
+	wg       *sync.WaitGroup
 }
 
-var jobs chan fetchSingleDocumentJob
+var jobsC chan jobRequest
 
-func process(ctx context.Context, job int, resultsChannel chan<- int, done chan<- bool) func() error {
+func process(ctx context.Context, job int, resultsC chan<- int, done chan<- bool) func() error {
 	return func() error {
 		defer func() {
 			done <- true
@@ -31,16 +31,16 @@ func process(ctx context.Context, job int, resultsChannel chan<- int, done chan<
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			resultsChannel <- job * 2
+			resultsC <- job * 2
 			return nil
 		}
 	}
 }
 
-func worker(jobs chan fetchSingleDocumentJob) func() error {
+func worker(jobs chan jobRequest) func() error {
 	done := make(chan bool)
 	for job := range jobs {
-		job.g.Go(process(job.ctx, job.job, job.resultsChannel, done))
+		job.g.Go(process(job.ctx, job.job, job.resultsC, done))
 		job.wg.Done()
 		<-done
 	}
@@ -49,9 +49,9 @@ func worker(jobs chan fetchSingleDocumentJob) func() error {
 
 func newService(workers int) *service {
 	s := &service{}
-	jobs = make(chan fetchSingleDocumentJob)
+	jobsC = make(chan jobRequest)
 	for i := 0; i < workers; i++ {
-		go worker(jobs)
+		go worker(jobsC)
 	}
 	return s
 }
@@ -61,31 +61,33 @@ func (s *service) request(input []int) []int {
 		return []int{}
 	}
 
-	results := make(chan int, len(input))
+	resultsC := make(chan int, len(input))
 
 	g, ctx := errgroup.WithContext(context.Background())
 	var wg sync.WaitGroup
 
+	// we publish jobs to the channel
 	wg.Add(len(input))
 	for _, v := range input {
 		go func(v int) {
-			fetchSingleDocumentJob := fetchSingleDocumentJob{
-				g:              g,
-				ctx:            ctx,
-				job:            v,
-				resultsChannel: results,
-				wg:             &wg,
+			jobRequest := jobRequest{
+				g:        g,
+				ctx:      ctx,
+				job:      v,
+				resultsC: resultsC,
+				wg:       &wg,
 			}
-			jobs <- fetchSingleDocumentJob
+			jobsC <- jobRequest
 		}(v)
 	}
+	// we wait for all the jobs to start
 	wg.Wait()
 
-	// Do we need to wait for the groups of jobs to finish?
+	// we wait for all the jobs to finish
 	if err := g.Wait(); err != nil {
 		fmt.Println(err)
 	}
-	close(results)
+	close(resultsC)
 
-	return buildResult(results)
+	return buildResult(resultsC)
 }
