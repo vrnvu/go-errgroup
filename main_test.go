@@ -53,10 +53,10 @@ func TestWorkers(t *testing.T) {
 }
 
 func TestBackground(t *testing.T) {
-	for inputSize := 10; inputSize <= 10; inputSize = inputSize + 100 {
+	for inputSize := 100; inputSize <= 1000; inputSize = inputSize + 100 {
 		input := buildInput(inputSize)
 		want := buildOutput(input)
-		for workers := 6; workers <= 6; workers++ {
+		for workers := 1; workers <= 6; workers++ {
 			s := newService(workers)
 			t.Run(fmt.Sprintf("inputSize: %d workers %d", inputSize, workers), func(t *testing.T) {
 				got := s.request(input)

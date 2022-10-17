@@ -66,26 +66,18 @@ func (s *service) request(input []int) []int {
 	g, ctx := errgroup.WithContext(context.Background())
 	var wg sync.WaitGroup
 
-	// 1 worker
-	// 2 jobs
-
-	// 1 worker in the background that reads for jobs
-
-	// we start publishing jobs
-	// we publish 1 job
-	// we wait for the complition of the jobs
-
-	// send jobs
+	wg.Add(len(input))
 	for _, v := range input {
-		wg.Add(1)
-		fetchSingleDocumentJob := fetchSingleDocumentJob{
-			g:              g,
-			ctx:            ctx,
-			job:            v,
-			resultsChannel: results,
-			wg:             &wg,
-		}
-		jobs <- fetchSingleDocumentJob
+		go func(v int) {
+			fetchSingleDocumentJob := fetchSingleDocumentJob{
+				g:              g,
+				ctx:            ctx,
+				job:            v,
+				resultsChannel: results,
+				wg:             &wg,
+			}
+			jobs <- fetchSingleDocumentJob
+		}(v)
 	}
 	wg.Wait()
 
