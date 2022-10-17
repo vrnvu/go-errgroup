@@ -37,9 +37,9 @@ func process(ctx context.Context, job int, resultsC chan<- int, done chan<- bool
 	}
 }
 
-func worker(jobs chan jobRequest) func() error {
+func worker() func() error {
 	done := make(chan bool)
-	for job := range jobs {
+	for job := range jobsC {
 		job.g.Go(process(job.ctx, job.job, job.resultsC, done))
 		job.wg.Done()
 		<-done
@@ -51,7 +51,7 @@ func newService(workers int) *service {
 	s := &service{}
 	jobsC = make(chan jobRequest)
 	for i := 0; i < workers; i++ {
-		go worker(jobsC)
+		go worker()
 	}
 	return s
 }
