@@ -21,10 +21,9 @@ type fetchSingleDocumentJob struct {
 
 var jobs chan fetchSingleDocumentJob
 
-func process(ctx context.Context, job int, resultsChannel chan<- int, done chan<- bool, wg *sync.WaitGroup) func() error {
+func process(ctx context.Context, job int, resultsChannel chan<- int, done chan<- bool) func() error {
 	return func() error {
 		defer func() {
-			wg.Done()
 			done <- true
 		}()
 
@@ -41,7 +40,8 @@ func process(ctx context.Context, job int, resultsChannel chan<- int, done chan<
 func worker(jobs chan fetchSingleDocumentJob) func() error {
 	done := make(chan bool)
 	for job := range jobs {
-		job.g.Go(process(job.ctx, job.job, job.resultsChannel, done, job.wg))
+		job.g.Go(process(job.ctx, job.job, job.resultsChannel, done))
+		job.wg.Done()
 		<-done
 	}
 	return nil
@@ -65,6 +65,15 @@ func (s *service) request(input []int) []int {
 
 	g, ctx := errgroup.WithContext(context.Background())
 	var wg sync.WaitGroup
+
+	// 1 worker
+	// 2 jobs
+
+	// 1 worker in the background that reads for jobs
+
+	// we start publishing jobs
+	// we publish 1 job
+	// we wait for the complition of the jobs
 
 	// send jobs
 	for _, v := range input {
